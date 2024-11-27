@@ -13,11 +13,7 @@ import java.sql.*;
 public class JLBookSalesApp extends Application {
 
     private Connection connection;
-<<<<<<< HEAD
-/*//Eye
-//    eye*/
-=======
-<<<<<<< HEAD
+//test
 
     @Override
     public void start(Stage primaryStage) {
