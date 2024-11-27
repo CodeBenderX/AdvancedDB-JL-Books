@@ -833,7 +833,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class JLBookSalesApp extends Application {
-	//Angelo//Bianca
+	//Angelo//Bianca//SAlunga
     private Connection connection;
     private ComboBox<String> databaseSelector;
     private Label connectionStringLabel;
