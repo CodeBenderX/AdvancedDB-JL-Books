@@ -1,4 +1,4 @@
-module JL_Books {
+module jlBooksProject {
 	requires javafx.controls;
 	requires java.sql;
 	
