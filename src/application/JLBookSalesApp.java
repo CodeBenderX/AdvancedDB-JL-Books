@@ -13,8 +13,8 @@ import java.sql.*;
 public class JLBookSalesApp extends Application {
 
     private Connection connection;
-//eyyyy
-    //eyyyy
+/*//Eye
+//    eye*/
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("JL Book Sales");
