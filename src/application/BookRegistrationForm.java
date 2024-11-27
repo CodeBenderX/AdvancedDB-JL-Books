@@ -13,6 +13,9 @@ import javafx.scene.text.FontWeight;
 public class BookRegistrationForm extends Application {
     @Override
     public void start(Stage primaryStage) {
+    	
+    	//Test - Bianca
+    	
         // Create main container
         VBox root = new VBox(15);
         root.setStyle("-fx-background-color: #2B2B2B;");
