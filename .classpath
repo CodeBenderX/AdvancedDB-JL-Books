@@ -6,12 +6,20 @@
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
+<<<<<<< HEAD
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JavaFx">
+=======
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JAVAFX SDK">
+>>>>>>> branch 'master' of https://github.com/CodeBenderX/AdvancedDB-JL-Books.git
 		<attributes>
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
+<<<<<<< HEAD
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JODBC6">
+=======
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JODBC">
+>>>>>>> branch 'master' of https://github.com/CodeBenderX/AdvancedDB-JL-Books.git
 		<attributes>
 			<attribute name="module" value="true"/>
 		</attributes>
