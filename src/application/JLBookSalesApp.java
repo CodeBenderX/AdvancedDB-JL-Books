@@ -9,11 +9,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import java.sql.*;
+//Angelo
 
 public class JLBookSalesApp extends Application {
 
     private Connection connection;
-<<<<<<< HEAD
 
     @Override
     public void start(Stage primaryStage) {
