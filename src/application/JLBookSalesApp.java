@@ -14,6 +14,10 @@ import java.sql.*;
 public class JLBookSalesApp extends Application {
 
     private Connection connection;
+<<<<<<< HEAD
+=======
+//test
+>>>>>>> branch 'master' of https://github.com/CodeBenderX/AdvancedDB-JL-Books.git
 
     @Override
     public void start(Stage primaryStage) {
@@ -226,6 +230,7 @@ public class JLBookSalesApp extends Application {
 =======
 //eyyyy
     //eyyyy
+>>>>>>> branch 'master' of https://github.com/CodeBenderX/AdvancedDB-JL-Books.git
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("JL Book Sales");
