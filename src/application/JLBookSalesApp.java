@@ -18,7 +18,8 @@ public class JLBookSalesApp extends Application {
 =======
 //test
 >>>>>>> branch 'master' of https://github.com/CodeBenderX/AdvancedDB-JL-Books.git
-
+//Angelo
+	
     @Override
     public void start(Stage primaryStage) {
         primaryStage.setTitle("JL Book Sales");
