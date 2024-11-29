@@ -821,6 +821,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -831,6 +832,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
+import javafx.scene.control.ListCell;
+import javafx.scene.layout.HBox;
+import javafx.scene.control.Button;
+import javafx.scene.control.ListView;
 
 public class JLBookSalesApp extends Application {
 	// Lorenzo//Angelo//Bianca
@@ -1013,89 +1020,161 @@ public class JLBookSalesApp extends Application {
 	}
 
 	private Callback<ListView<Book>, ListCell<Book>> createBookCellFactory() {
-		return listView -> new ListCell<Book>() {
-			private TextField categoryField;
-			private TextField costField;
-			private TextField retailField;
+        return listView -> new ListCell<Book>() {
+            private TextField categoryField;
+            private TextField costField;
+            private TextField retailField;
+            private Button updateButton;
+            private Button revertButton;
 
-			@Override
-			protected void updateItem(Book book, boolean empty) {
-				super.updateItem(book, empty);
-				if (empty || book == null) {
-					setText(null);
-					setGraphic(null);
-				} else {
-					if (categoryField == null) {
-						createFields();
-					}
-					updateFields(book);
-					HBox container = createContainer(book);
-					setGraphic(container);
-				}
-			}
+            @Override
+            protected void updateItem(Book book, boolean empty) {
+                super.updateItem(book, empty);
+                if (empty || book == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    if (categoryField == null) {
+                        createFields();
+                    }
+                    updateFields(book);
+                    HBox container = createContainer(book);
+                    setGraphic(container);
+                }
+            }
 
-			private void createFields() {
-				categoryField = new TextField();
-				costField = new TextField();
-				retailField = new TextField();
+            private void createFields() {
+                categoryField = new TextField();
+                costField = new TextField();
+                retailField = new TextField();
+                updateButton = new Button("Update");
+                revertButton = new Button("Revert");
 
-				categoryField.setPrefWidth(100);
-				costField.setPrefWidth(80);
-				retailField.setPrefWidth(80);
-			}
+                categoryField.setPrefWidth(100);
+                costField.setPrefWidth(80);
+                retailField.setPrefWidth(80);
 
-			private void updateFields(Book book) {
-				categoryField.setText(book.getCategory());
-				costField.setText(formatCurrency(book.getCost()));
-				retailField.setText(formatCurrency(book.getRetail()));
-			}
+                setupFieldListeners(categoryField, "category");
+                setupFieldListeners(costField, "cost");
+                setupFieldListeners(retailField, "retail");
 
-			private HBox createContainer(Book book) {
-				HBox container = new HBox(10);
-				container.setAlignment(Pos.CENTER_LEFT);
-				container.setPadding(new Insets(5));
+                updateButton.setOnAction(e -> {
+                    Book book = getItem();
+                    if (book != null) {
+                        updateBookInDatabase(book);
+                    }
+                });
+                
+                revertButton.setOnAction(e -> {  // New: Added action for revert button
+                    Book book = getItem();
+                    if (book != null) {
+                        revertBookChanges(book);
+                    }
+                });
+                
+                updateButton.setVisible(false);
+                revertButton.setVisible(false);
+            }
 
-				Label isbnLabel = new Label(book.getIsbn());
-				Label titleLabel = new Label(book.getTitle());
-				Label pubdateLabel = new Label(book.getPubdate().format(dateFormatter));
-				Label pubidLabel = new Label(String.valueOf(book.getPubid()));
-				Label discountLabel = new Label(formatCurrency(book.getDiscount()));
+            private void setupFieldListeners(TextField field, String property) {
+                field.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+                    if (!isFocused) {
+                        updateBookProperty(getItem(), property, field.getText());
+                    }
+                });
 
-				isbnLabel.setPrefWidth(100);
-				titleLabel.setPrefWidth(200);
-				pubdateLabel.setPrefWidth(100);
-				pubidLabel.setPrefWidth(60);
-				discountLabel.setPrefWidth(80);
+                field.setOnAction(event -> {
+                    updateBookProperty(getItem(), property, field.getText());
+                });
+            }
 
-				container.getChildren().addAll(isbnLabel, titleLabel, pubdateLabel, pubidLabel, costField, retailField,
-						discountLabel, categoryField);
-				return container;
-			}
-		};
-	}
+//                field.setOnKeyPressed(event -> {
+//                    if (event.getCode() == KeyCode.ENTER) {
+//                        updateBookProperty(getItem(), property, field.getText());
+//                    }
+//                });
+//            }
+
+            private void updateFields(Book book) {
+                categoryField.setText(book.getCategory());
+                costField.setText(formatCurrency(book.getCost()));
+                retailField.setText(formatCurrency(book.getRetail()));
+
+                categoryField.setStyle(book.isCategoryChanged() ? "-fx-background-color: lightgreen;" : "");
+                costField.setStyle(book.isCostChanged() ? "-fx-background-color: lightgreen;" : "");
+                retailField.setStyle(book.isRetailChanged() ? "-fx-background-color: lightgreen;" : "");
+
+                updateButton.setVisible(book.isChanged());
+                revertButton.setVisible(book.isChanged());
+            }
+
+            private HBox createContainer(Book book) {
+                HBox container = new HBox(10);
+                container.setAlignment(Pos.CENTER_LEFT);
+                container.setPadding(new Insets(5));
+
+                Label isbnLabel = new Label(book.getIsbn());
+                Label titleLabel = new Label(book.getTitle());
+                Label pubdateLabel = new Label(book.getPubdate().format(dateFormatter));
+                Label pubidLabel = new Label(String.valueOf(book.getPubid()));
+                Label discountLabel = new Label(formatCurrency(book.getDiscount()));
+
+                isbnLabel.setPrefWidth(100);
+                titleLabel.setPrefWidth(200);
+                pubdateLabel.setPrefWidth(100);
+                pubidLabel.setPrefWidth(60);
+                discountLabel.setPrefWidth(80);
+
+                container.getChildren().addAll(
+                    isbnLabel, titleLabel, pubdateLabel, pubidLabel,
+                    costField, retailField, discountLabel, categoryField, updateButton, revertButton
+                );
+                return container;
+            }
+            
+            private void revertBookChanges(Book book) {
+                Book originalBook = originalBooks.get(book.getIsbn());
+                book.setCategory(originalBook.getCategory());
+                book.setCost(originalBook.getCost());
+                book.setRetail(originalBook.getRetail());
+                book.setChanged(false);
+                book.setCategoryChanged(false);
+                book.setCostChanged(false);
+                book.setRetailChanged(false);
+                updateFields(book);
+                bookListView.refresh();
+            }
+        };
+    }
 
 	private void handleUpdate() {
-		ObservableList<Book> books = bookListView.getItems();
-		for (Book book : books) {
-			updateBookInDatabase(book);
-		}
-		originalBooks.clear();
-		for (Book book : books) {
-			originalBooks.put(book.getIsbn(), book.copy());
-		}
-		bookListView.refresh();
-	}
+        ObservableList<Book> books = bookListView.getItems();
+        for (Book book : books) {
+            if (book.isChanged()) {
+                updateBookInDatabase(book);
+                book.setChanged(false);
+            }
+        }
+        bookListView.refresh();
+        showAlert("Success", "All changes have been saved to the database.");
+    }
+
 
 	private void handleRevertAll() {
-		ObservableList<Book> books = bookListView.getItems();
-		for (Book book : books) {
-			Book originalBook = originalBooks.get(book.getIsbn());
-			book.setCategory(originalBook.getCategory());
-			book.setCost(originalBook.getCost());
-			book.setRetail(originalBook.getRetail());
-		}
-		bookListView.refresh();
-	}
+        ObservableList<Book> books = bookListView.getItems();
+        for (Book book : books) {
+            Book originalBook = originalBooks.get(book.getIsbn());
+            book.setCategory(originalBook.getCategory());
+            book.setCost(originalBook.getCost());
+            book.setRetail(originalBook.getRetail());
+            book.setChanged(false);
+            book.setCategoryChanged(false);
+            book.setCostChanged(false);
+            book.setRetailChanged(false);
+        }
+        bookListView.refresh();
+    }
+
 
 	private void handleCancel(Stage primaryStage, Stage currentStage) {
 		currentStage.close();
@@ -1110,58 +1189,128 @@ public class JLBookSalesApp extends Application {
 	}
 
 	private void loadBooksFromDatabase() {
-		if (connection == null) {
-			showAlert("Error", "No database connection. Please connect to a database first.");
-			return;
-		}
+        if (connection == null) {
+            showAlert("Error", "No database connection. Please connect to a database first.");
+            return;
+        }
 
-		ObservableList<Book> books = FXCollections.observableArrayList();
-		String query = "SELECT ISBN, TITLE, PUBDATE, PUBID, COST, RETAIL, DISCOUNT, CATEGORY FROM JL_BOOKS";
+        ObservableList<Book> books = FXCollections.observableArrayList();
+        String query = "SELECT ISBN, TITLE, PUBDATE, PUBID, COST, RETAIL, DISCOUNT, CATEGORY FROM JL_BOOKS";
 
-		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
 
-			while (rs.next()) {
-				Book book = new Book(rs.getString("ISBN"), rs.getString("TITLE"), rs.getDate("PUBDATE").toLocalDate(),
-						rs.getString("PUBID"), rs.getDouble("COST"), rs.getDouble("RETAIL"), rs.getDouble("DISCOUNT"),
-						rs.getString("CATEGORY"));
-				books.add(book);
-				originalBooks.put(book.getIsbn(), book.copy());
-			}
+            while (rs.next()) {
+                Book book = new Book(
+                    rs.getString("ISBN"),
+                    rs.getString("TITLE"),
+                    rs.getDate("PUBDATE").toLocalDate(),
+                    rs.getString("PUBID"),
+                    rs.getDouble("COST"),
+                    rs.getDouble("RETAIL"),
+                    rs.getDouble("DISCOUNT"),
+                    rs.getString("CATEGORY")
+                );
+                books.add(book);
+                originalBooks.put(book.getIsbn(), book.copy());
+            }
 
-			Platform.runLater(() -> {
-				bookListView.setItems(books);
-				System.out.println("Loaded " + books.size() + " books from the database.");
-			});
-		} catch (SQLException e) {
-			e.printStackTrace();
-			Platform.runLater(() -> {
-				showAlert("Error", "Failed to load books: " + e.getMessage());
-				System.err.println("SQL Error: " + e.getMessage());
-			});
-		}
-	}
+            Platform.runLater(() -> {
+                bookListView.setItems(books);
+                System.out.println("Loaded " + books.size() + " books from the database.");
+            });
+        } catch (SQLException e) {
+            e.printStackTrace();
+            Platform.runLater(() -> {
+                showAlert("Error", "Failed to load books: " + e.getMessage());
+                System.err.println("SQL Error: " + e.getMessage());
+            });
+        }
+    }
 
 	private void updateBookInDatabase(Book book) {
-		String query = "UPDATE JL_BOOKS SET CATEGORY = ?, COST = ?, RETAIL = ? WHERE ISBN = ?";
+        String sql = "{CALL sp_Book_update(?, ?, ?, ?)}";
 
-		try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-			pstmt.setString(1, book.getCategory());
-			pstmt.setDouble(2, book.getCost());
-			pstmt.setDouble(3, book.getRetail());
-			pstmt.setString(4, book.getIsbn());
+        try (CallableStatement stmt = connection.prepareCall(sql)) {
+            stmt.setString(1, book.getIsbn());
+            stmt.setString(2, book.getCategory());
+            stmt.setDouble(3, book.getCost());
+            stmt.setDouble(4, book.getRetail());
 
-			int affectedRows = pstmt.executeUpdate();
-			if (affectedRows > 0) {
-				System.out.println("Book updated successfully!");
-			} else {
-				System.out.println("Failed to update book. No rows affected.");
-			}
-		} catch (SQLException e) {
-			e.printStackTrace();
-			showAlert("Error", "Failed to update book: " + e.getMessage());
-		}
-	}
+            stmt.execute();
+            System.out.println("Book updated successfully: " + book.getIsbn());
 
+            // Update the original book in the map
+            originalBooks.put(book.getIsbn(), book.copy());
+            
+         // Show success message
+//            Platform.runLater(() -> showAlert("Success", "Book updated successfully: " + book.getIsbn()));
+
+            // Reset the changed flags
+            book.setChanged(false);
+            book.setCategoryChanged(false);
+            book.setCostChanged(false);
+            book.setRetailChanged(false);
+
+            // Refresh the ListView
+            Platform.runLater(() -> {
+                bookListView.refresh();
+                showAlert("Success", "Book updated successfully: " + book.getIsbn());
+            });
+            
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showAlert("Error", "Failed to update book: " + e.getMessage());
+        }
+    }
+
+	private void updateBookProperty(Book book, String property, String newValue) {
+        if (book == null) return;
+
+        boolean changed = false;
+        switch (property) {
+            case "category":
+                if (!newValue.equals(book.getCategory())) {
+                    book.setCategory(newValue);
+                    book.setCategoryChanged(true);
+                    book.setChanged(true);
+                    changed = true;
+                }
+                break;
+            case "cost":
+                double newCost = parseCurrency(newValue);
+                if (newCost != book.getCost()) {
+                    book.setCost(newCost);
+                    book.setCostChanged(true);
+                    book.setChanged(true);
+                    changed = true;
+                }
+                break;
+            case "retail":
+                double newRetail = parseCurrency(newValue);
+                if (newRetail != book.getRetail()) {
+                    book.setRetail(newRetail);
+                    book.setRetailChanged(true);
+                    book.setChanged(true);
+                    changed = true;
+                }
+                break;
+        }
+
+        if (changed) {
+            book.setChanged(true);
+            bookListView.refresh();
+        }
+    }
+
+    private double parseCurrency(String value) {
+        try {
+            return Double.parseDouble(value.replaceAll("[^\\d.]", ""));
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+	
 	private void showBookRegistrationForm() {
 		Stage stage = new Stage();
 		stage.setTitle("Register New Book");
@@ -1366,11 +1515,11 @@ public class JLBookSalesApp extends Application {
 
 		if ("School".equals(selectedDatabase)) {
 			url = "jdbc:oracle:thin:@oracle1.centennialcollege.ca:1521:SQLD";
-			user = "COMP214_F24_er_19";
+			user = "COMP214_F24_er_13";
 			password = "password";
 		} else { // Remote
 			url = "jdbc:oracle:thin:@199.212.26.208:1521:SQLD";
-			user = "COMP214_F24_er_19";
+			user = "COMP214_F24_er_13";
 			password = "password";
 		}
 
