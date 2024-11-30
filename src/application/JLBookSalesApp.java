@@ -683,32 +683,139 @@ public class JLBookSalesApp extends Application {
 			showAlert("Error", "Invalid number format. Please check cost, retail, and discount fields.");
 		}
 	}
+	
+	//==============================================================================
+	//start author registration and assignment
 
 	private VBox createAuthorsContent() {
-		VBox content = new VBox(10);
-		content.setPadding(new Insets(20));
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
 
-		Label titleLabel = new Label("Author Management");
-		titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        Label titleLabel = new Label("Author Management");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
 
-		Button registerButton = new Button("Register New Author");
-		registerButton.setOnAction(e -> showAuthorRegistrationForm());
+        Button registerButton = new Button("Register New Author");
+        registerButton.setOnAction(e -> showAuthorRegistrationForm());
 
-		Button assignButton = new Button("Assign Author to Book");
-		assignButton.setOnAction(e -> showAuthorAssignmentForm());
+        Button assignButton = new Button("Assign Author to Book");
+        assignButton.setOnAction(e -> showAuthorAssignmentForm());
 
-		content.getChildren().addAll(titleLabel, registerButton, assignButton);
-		return content;
+        content.getChildren().addAll(titleLabel, registerButton, assignButton);
+        return content;
+    }
+	private Object showAuthorRegistrationForm() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
-	private void showAuthorRegistrationForm() {
-		showAlert("Info", "Author registration functionality not implemented yet.");
+	public void showAuthorAssignmentForm() {
+	    if (connection == null) {
+	        showAlert("Error", "Please connect to the database first.");
+	        return;
+	    }
+
+	    Stage stage = new Stage();
+	    stage.setTitle("Assign Author to Book");
+
+	    GridPane grid = new GridPane();
+	    grid.setPadding(new Insets(20));
+	    grid.setVgap(10);
+	    grid.setHgap(10);
+
+	    ComboBox<String> isbnComboBox = new ComboBox<>();
+	    loadISBNs(isbnComboBox);
+
+	    ComboBox<String> authorIdComboBox = new ComboBox<>();
+	    try {
+	        loadAuthorIds(authorIdComboBox);
+	    } catch (SQLException e) {
+	        showAlert("Error", "Failed to load author IDs: " + e.getMessage());
+	        e.printStackTrace();
+	    }
+
+	    grid.addRow(0, new Label("Choose Book (ISBN):"), isbnComboBox);
+	    grid.addRow(1, new Label("Choose Author (ID):"), authorIdComboBox);
+
+	    Button assignButton = new Button("Assign");
+	    assignButton.setOnAction(e -> {
+	        if (isbnComboBox.getValue() != null && authorIdComboBox.getValue() != null) {
+	            try {
+	                assignAuthorToBook(isbnComboBox.getValue(), authorIdComboBox.getValue());
+	                stage.close();
+	            } catch (SQLException ex) {
+	                showAlert("Error", "Failed to assign author to book: " + ex.getMessage());
+	                ex.printStackTrace();
+	            }
+	        } else {
+	            showAlert("Error", "Please select both a book and an author.");
+	        }
+	    });
+
+	    grid.addRow(2, assignButton);
+
+	    stage.setScene(new Scene(grid));
+	    stage.show();
 	}
 
-	private void showAuthorAssignmentForm() {
-		showAlert("Info", "Author assignment functionality not implemented yet.");
+	public void assignAuthorToBook(String isbn, String authorId) throws SQLException {
+	    String insertSql = "INSERT INTO JL_BOOKAUTHOR (ISBN, AUTHORID) VALUES (?, ?)";
+	    String deleteSql = "DELETE FROM JL_BOOKAUTHOR WHERE ISBN = ?";
+	    
+	    try {
+	        // First, delete any existing author assignments for this book
+	        try (PreparedStatement deleteStmt = connection.prepareStatement(deleteSql)) {
+	            deleteStmt.setString(1, isbn);
+	            deleteStmt.executeUpdate();
+	        }
+	        
+	        // Then, insert the new author assignment
+	        try (PreparedStatement insertStmt = connection.prepareStatement(insertSql)) {
+	            insertStmt.setString(1, isbn);
+	            insertStmt.setString(2, authorId);
+	            int rowsAffected = insertStmt.executeUpdate();
+	            
+	            if (rowsAffected > 0) {
+	                connection.commit(); // Commit the transaction
+	                showAlert("Success", "Author assigned to book successfully!");
+	            } else {
+	                connection.rollback(); // Rollback if no rows were affected
+	                showAlert("Error", "Failed to assign author to book. No rows affected.");
+	            }
+	        }
+	    } catch (SQLException e) {
+	        connection.rollback(); // Rollback in case of any error
+	        showAlert("Error", "Failed to assign author to book: " + e.getMessage());
+	        e.printStackTrace();
+	    }
 	}
 
+	private void loadISBNs(ComboBox<String> comboBox) {
+	    String sql = "SELECT ISBN FROM JL_BOOKS";
+	    try (Statement stmt = connection.createStatement();
+	         ResultSet rs = stmt.executeQuery(sql)) {
+	        comboBox.getItems().clear(); // Clear existing items
+	        while (rs.next()) {
+	            comboBox.getItems().add(rs.getString("ISBN"));
+	        }
+	    } catch (SQLException e) {
+	        showAlert("Error", "Failed to load ISBNs: " + e.getMessage());
+	    }
+	}
+
+	public void loadAuthorIds(javafx.scene.control.ComboBox<String> comboBox) throws SQLException {
+	    String sql = "SELECT AUTHORID FROM JL_AUTHOR";
+	    try (Statement statement = connection.createStatement();
+	         ResultSet rs = statement.executeQuery(sql)) {
+	        comboBox.getItems().clear(); // Clear existing items
+	        while (rs.next()) {
+	            comboBox.getItems().add(rs.getString("AUTHORID"));
+	        }
+	    } catch (SQLException e) {
+	        showAlert("Error", "Failed to load Author IDs: " + e.getMessage());
+	        e.printStackTrace();
+	    }
+	}
+	
 	private VBox createCustomersContent() {
 		VBox content = new VBox(10);
 		content.setPadding(new Insets(20));
@@ -733,94 +840,115 @@ public class JLBookSalesApp extends Application {
 	private void showCustomerUpdateForm() {
 		showAlert("Info", "Customer update functionality not implemented yet.");
 	}
+	
+	//End author registration and assignment
+	//============================================================
 
-	private boolean isDatabaseConnected() {
-		if (connection == null) {
-			return false;
-		}
-		try {
-			return !connection.isClosed();
-		} catch (SQLException e) {
-			e.printStackTrace();
-			return false;
-		}
-	}
+//	private boolean isDatabaseConnected() {
+//		if (connection == null) {
+//			return false;
+//		}
+//		try {
+//			return !connection.isClosed();
+//		} catch (SQLException e) {
+//			e.printStackTrace();
+//			return false;
+//		}
+//	}
 
 	private void connectToDatabase() {
-		String selectedDatabase = databaseSelector.getValue();
-		String url, user, password;
+	    String selectedDatabase = databaseSelector.getValue();
+	    String url, user, password;
 
-		if ("School".equals(selectedDatabase)) {
-			url = "jdbc:oracle:thin:@oracle1.centennialcollege.ca:1521:SQLD";
-			user = "COMP214_F24_er_13";
-			password = "password";
-		} else { // Remote
-			url = "jdbc:oracle:thin:@199.212.26.208:1521:SQLD";
-			user = "COMP214_F24_er_13";
-			password = "password";
-		}
+	    if ("School".equals(selectedDatabase)) {
+	        url = "jdbc:oracle:thin:@oracle1.centennialcollege.ca:1521:SQLD";
+	        user = "COMP214_F24_er_13";
+	        password = "password";
+	    } else { // Remote
+	        url = "jdbc:oracle:thin:@199.212.26.208:1521:SQLD";
+	        user = "COMP214_F24_er_13";
+	        password = "password";
+	    }
 
-		new Thread(() -> {
-			try {
-				if (isDatabaseConnected()) {
-					connection.close();
-				}
-				connection = DriverManager.getConnection(url, user, password);
+	    new Thread(() -> {
+	        try {
+	            if (isDatabaseConnected()) {
+	                connection.close();
+	            }
+	            connection = DriverManager.getConnection(url, user, password);
 
-				Platform.runLater(() -> {
-					connectionStringLabel.setText("Connected: " + url);
-					connectionStringLabel.setStyle("-fx-font-style: normal; -fx-text-fill: green;");
-					System.out.println("Connection successful. Label updated to: " + connectionStringLabel.getText());
+	            Platform.runLater(() -> {
+	                connectionStringLabel.setText("Connected: " + url);
+	                connectionStringLabel.setStyle("-fx-font-style: normal; -fx-text-fill: green;");
+	                System.out.println("Connection successful. Label updated to: " + connectionStringLabel.getText());
 
-					// Enable all tabs
-					for (Tab tab : tabPane.getTabs()) {
-						tab.setDisable(false);
-					}
+	                // Enable all tabs
+	                for (Tab tab : tabPane.getTabs()) {
+	                    tab.setDisable(false);
+	                }
 
-					// Update Home tab content
-					VBox homeContent = (VBox) tabPane.getTabs().get(0).getContent();
-					homeContent.getChildren().get(0).setVisible(false); // Hide instruction label
-					homeContent.getChildren().get(1).setVisible(true); // Show welcome label
-					homeContent.getChildren().get(2).setVisible(true); // Show description label
+	                // Update Home tab content
+	                VBox homeContent = (VBox) tabPane.getTabs().get(0).getContent();
+	                homeContent.getChildren().get(0).setVisible(false); // Hide instruction label
+	                homeContent.getChildren().get(1).setVisible(true); // Show welcome label
+	                homeContent.getChildren().get(2).setVisible(true); // Show description label
 
-					// Enable buttons in all tabs
-					enableTabButtons(tabPane.getTabs().get(1)); // Books tab
-					enableTabButtons(tabPane.getTabs().get(2)); // Authors tab
-					enableTabButtons(tabPane.getTabs().get(3)); // Customers tab
-				});
+	                // Enable buttons in all tabs
+	                for (Tab tab : tabPane.getTabs()) {
+	                    enableTabButtons(tab);
+	                }
 
-				showAlert("Success", "Successfully connected to " + selectedDatabase + " database!");
-			} catch (SQLException e) {
-				Platform.runLater(() -> {
-					connectionStringLabel.setText("Not connected");
-					connectionStringLabel.setStyle("-fx-font-style: italic; -fx-text-fill: red;");
-					System.out.println("Connection failed. Label updated to: " + connectionStringLabel.getText());
+	                // Refresh Authors tab content
+	                Tab authorsTab = tabPane.getTabs().stream()
+	                    .filter(tab -> "Authors".equals(tab.getText()))
+	                    .findFirst()
+	                    .orElse(null);
+	                if (authorsTab != null) {
+	                    authorsTab.setContent(createAuthorsContent());
+	                }
 
-					// Disable all tabs except Home
-					for (int i = 1; i < tabPane.getTabs().size(); i++) {
-						tabPane.getTabs().get(i).setDisable(true);
-					}
+	                showAlert("Success", "Successfully connected to " + selectedDatabase + " database!");
+	            });
+	        } catch (SQLException e) {
+	            Platform.runLater(() -> {
+	                connectionStringLabel.setText("Not connected");
+	                connectionStringLabel.setStyle("-fx-font-style: italic; -fx-text-fill: red;");
+	                System.out.println("Connection failed. Label updated to: " + connectionStringLabel.getText());
 
-					// Update Home tab content
-					VBox homeContent = (VBox) tabPane.getTabs().get(0).getContent();
-					homeContent.getChildren().get(0).setVisible(true); // Show instruction label
-					homeContent.getChildren().get(1).setVisible(false); // Hide welcome label
-					homeContent.getChildren().get(2).setVisible(false); // Hide description label
+	                // Disable all tabs except Home
+	                for (int i = 1; i < tabPane.getTabs().size(); i++) {
+	                    tabPane.getTabs().get(i).setDisable(true);
+	                }
 
-					showAlert("Connection Error", "Failed to connect to the database: " + e.getMessage());
-				});
-				e.printStackTrace();
-			}
-		}).start();
+	                // Update Home tab content
+	                VBox homeContent = (VBox) tabPane.getTabs().get(0).getContent();
+	                homeContent.getChildren().get(0).setVisible(true); // Show instruction label
+	                homeContent.getChildren().get(1).setVisible(false); // Hide welcome label
+	                homeContent.getChildren().get(2).setVisible(false); // Hide description label
+
+	                showAlert("Connection Error", "Failed to connect to the database: " + e.getMessage());
+	            });
+	            e.printStackTrace();
+	        }
+	    }).start();
 	}
 
 	private void enableTabButtons(Tab tab) {
-		VBox content = (VBox) tab.getContent();
-		for (javafx.scene.Node node : content.getChildren()) {
-			if (node instanceof Button) {
-				((Button) node).setDisable(false);
-			}
-		}
+	    VBox content = (VBox) tab.getContent();
+	    for (javafx.scene.Node node : content.getChildren()) {
+	        if (node instanceof javafx.scene.control.Button) {
+	            ((javafx.scene.control.Button) node).setDisable(false);
+	        }
+	    }
+	}
+
+	private boolean isDatabaseConnected() {
+	    try {
+	        return connection != null && !connection.isClosed();
+	    } catch (SQLException e) {
+	        e.printStackTrace();
+	        return false;
+	    }
 	}
 
 	private void showAlert(String title, String message) {
