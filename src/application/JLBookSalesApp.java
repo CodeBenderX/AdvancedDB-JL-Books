@@ -102,6 +102,7 @@ public class JLBookSalesApp extends Application {
 		VBox content = new VBox(20);
 		content.setPadding(new Insets(20));
 		content.setAlignment(Pos.CENTER);
+		
 
 		homeInstructionLabel = new Label("Please use the connection controls above to connect to the database.");
 		homeInstructionLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #4a4a4a;");
