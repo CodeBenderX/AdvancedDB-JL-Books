@@ -6,7 +6,9 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+
 
 import java.sql.*;
 
@@ -177,7 +179,9 @@ public class AuthorManagement {
         assignButton.setOnAction(e -> {
             if (isbnComboBox.getValue() != null && authorIdComboBox.getValue() != null) {
                 try {
-                    assignAuthorToBook(isbnComboBox.getValue(), authorIdComboBox.getValue());
+                	String selectedIsbn = isbnComboBox.getValue().split(" - ")[0];
+                    String selectedAuthorId = authorIdComboBox.getValue().split(" - ")[0];
+                    assignAuthorToBook(selectedIsbn, selectedAuthorId);
                     stage.close();
                 } catch (SQLException ex) {
                     showAlert("Error", "Failed to assign author to book: " + ex.getMessage());
@@ -227,26 +231,36 @@ public class AuthorManagement {
     }
 
     private void loadISBNs(ComboBox<String> isbnComboBox) {
-        String query = "SELECT ISBN FROM JL_BOOKS";
+        String query = "SELECT ISBN, TITLE FROM JL_BOOKS ORDER BY TITLE";
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
+            isbnComboBox.getItems().clear(); // Clear existing items
             while (rs.next()) {
-                isbnComboBox.getItems().add(rs.getString("ISBN"));
+                String isbn = rs.getString("ISBN");
+                String title = rs.getString("TITLE");
+                String displayText = String.format("%s - %s", isbn, title);
+                isbnComboBox.getItems().add(displayText);
             }
         } catch (SQLException e) {
-            showAlert("Error", "Failed to load ISBNs: " + e.getMessage());
+            showAlert("Error", "Failed to load ISBNs and titles: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     private void loadAuthorIds(ComboBox<String> authorIdComboBox) throws SQLException {
-        String query = "SELECT AUTHORID FROM JL_AUTHOR";
+    	String query = "SELECT AUTHORID, FNAME || ' ' || LNAME AS AUTHOR_NAME FROM JL_AUTHOR ORDER BY LNAME, FNAME";
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
-        	authorIdComboBox.getItems().clear();
+            authorIdComboBox.getItems().clear(); // Clear existing items
             while (rs.next()) {
-            	authorIdComboBox.getItems().add(rs.getString("AUTHORID"));
+                String authorId = rs.getString("AUTHORID");
+                String authorName = rs.getString("AUTHOR_NAME");
+                String displayText = String.format("%s - %s", authorId, authorName);
+                authorIdComboBox.getItems().add(displayText);
             }
+        } catch (SQLException e) {
+            showAlert("Error", "Failed to load author IDs and names: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -261,4 +275,109 @@ public class AuthorManagement {
             alert.showAndWait();
         });
     }
+    
+    public void showBookAuthorList() {
+        Stage stage = new Stage();
+        stage.setTitle("Book-Author List");
+        
+        HBox headerBox = new HBox(10);
+        headerBox.setPadding(new Insets(10, 10, 5, 10));
+        headerBox.getChildren().addAll(
+            createHeaderLabel("ISBN", 120),
+            createHeaderLabel("Title", 320),
+            createHeaderLabel("Author", 200),
+            createHeaderLabel("Author ID", 80)
+        );
+
+        ListView<HBox> listView = new ListView<>();
+        listView.setStyle("-fx-font-family: 'Courier New'; -fx-font-size: 12px;");
+        listView.setPadding(new Insets(0, 10, 10, 10));
+
+        String query = """
+            SELECT b.ISBN, b.TITLE, a.FNAME || ' ' || a.LNAME as AUTHOR_NAME, a.AUTHORID
+            FROM JL_BOOKS b
+            LEFT JOIN JL_BOOKAUTHOR ba ON b.ISBN = ba.ISBN
+            LEFT JOIN JL_AUTHOR a ON ba.AUTHORID = a.AUTHORID
+            ORDER BY b.ISBN
+        """;
+
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            // Add header
+            //listView.getItems().add(String.format("%-12s | %-32s | %-20s | %-8s",
+                //"ISBN", "Title", "Author", "Author ID"));
+            //listView.getItems().add("-".repeat(80));
+
+            while (rs.next()) {
+                String isbn = rs.getString("ISBN");
+                String title = rs.getString("TITLE");
+                String authorName = rs.getString("AUTHOR_NAME");
+                String authorId = rs.getString("AUTHORID");
+
+//                String displayText = String.format("%-12s | %-32s | %-20s | %-8s",
+//                    isbn != null ? isbn : "",
+//                    title != null ? title : "",
+//                    authorName != null ? authorName : "",
+//                    authorId != null ? authorId : "N/A");
+//
+//                listView.getItems().add(displayText);
+                HBox row = new HBox(0);
+                row.getChildren().addAll(
+                    createDataLabel(isbn != null ? isbn : "", 120),
+                    createDataLabel(title != null ? title : "", 320),
+                    createDataLabel(authorName != null ? authorName : "", 200),
+                    createDataLabel(authorId != null ? authorId : "N/A", 80)
+                );
+
+                listView.getItems().add(row);
+            }
+        } catch (SQLException e) {
+            showAlert("Error", "Failed to load book-author list: " + e.getMessage());
+            e.printStackTrace();
+            return;
+        }
+
+        VBox vbox = new VBox(10);
+        vbox.setPadding(new Insets(10));
+        vbox.getChildren().addAll(headerBox, listView);
+
+        double totalHeight = listView.getItems().size() * 24; // Approximate height per row
+        listView.setPrefHeight(totalHeight);
+
+        // Set the stage size based on content
+        stage.setMinWidth(750);
+        stage.setMinHeight(totalHeight + 100); // Add extra space for header and padding
+        stage.setMaxHeight(totalHeight + 100); // Lock the maximum height
+
+        stage.setScene(new Scene(vbox));
+        stage.show();
+    }
+    
+    private Label createHeaderLabel(String text, double width) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-weight: bold; -fx-font-family: 'Courier New'; -fx-font-size: 12px;");
+        label.setPrefWidth(width);
+        return label;
+    }
+
+    private Label createDataLabel(String text, double width) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-family: 'Courier New'; -fx-font-size: 12px;");
+        label.setPrefWidth(width);
+        return label;
+    }
+
+//    private void showAlert(String title, String message) {
+//        Platform.runLater(() -> {
+//            Alert.AlertType type = title.toLowerCase().contains("error") ? Alert.AlertType.ERROR
+//                    : Alert.AlertType.INFORMATION;
+//            Alert alert = new Alert(type);
+//            alert.setTitle(title);
+//            alert.setHeaderText(null);
+//            alert.setContentText(message);
+//            alert.showAndWait();
+//        });
+//    }
 }
+

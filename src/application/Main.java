@@ -127,8 +127,11 @@ public class Main extends Application {
 
         Button assignButton = new Button("Assign Author to Book");
         assignButton.setOnAction(e -> authorManagement.showAuthorAssignmentForm());
+        
+        Button showListButton = new Button("Show Book-Author List");
+        showListButton.setOnAction(e -> authorManagement.showBookAuthorList());	
 
-        content.getChildren().addAll(titleLabel, registerButton, assignButton);
+        content.getChildren().addAll(titleLabel, registerButton, assignButton, showListButton);
         return content;
     }
 
