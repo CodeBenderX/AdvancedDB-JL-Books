@@ -35,6 +35,15 @@ public class AuthorManagement {
         setupAuthorIdValidation(authorIdField);
         setupLastNameValidation(lastNameField);
         setupFirstNameValidation(firstNameField);
+        
+        authorIdField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue != null) {
+                String upperCase = newValue.toUpperCase();
+                if (!newValue.equals(upperCase)) {
+                    authorIdField.setText(upperCase);
+                }
+            }
+        });
 
         grid.addRow(0, new Label("Author ID:"), authorIdField);
         grid.addRow(1, new Label("First Name:"), firstNameField);
