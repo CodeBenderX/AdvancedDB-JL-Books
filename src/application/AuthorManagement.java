@@ -143,7 +143,6 @@ public class AuthorManagement {
                 errorMessage = "Invalid input. Please check the author details and try again.";
             }
             showAlert("Error", errorMessage);
-            e.printStackTrace();  // Log the full stack trace for debugging
         }
     }
 
