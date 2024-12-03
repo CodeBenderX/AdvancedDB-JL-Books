@@ -4,6 +4,7 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -18,26 +19,36 @@ public class Main extends Application {
     private TabPane tabPane;
     private BookManagement bookManagement;
     private AuthorManagement authorManagement;
+    
+    
+    private static final String TAB_COLOR = "#E8CBA0";
+    private static final String ACTIVE_TAB_COLOR = "#A67C4D";
+    private static final String BACKGROUND_COLOR = "#FDFDFD";
+    private static final String PAGE_COLOR = "#D9B68D";
+
     //Lorenzo
     @Override
     public void start(Stage primaryStage) {
-        try {
-            primaryStage.setTitle("JL Book Sales");
+        VBox root = new VBox();
+        root.setPadding(new Insets(10)); // Add padding to the root
+        root.setStyle("-fx-background-color: " + PAGE_COLOR + ";");
+        
+        setupDatabaseControls(root);
+        setupTabPane();
+        HBox tabPaneContainer = new HBox(10);
+        tabPaneContainer.setPadding(new Insets(0, 50, 0, 50)); // Add left and right padding
+        tabPaneContainer.getChildren().add(tabPane);
 
-            VBox root = new VBox(10);
-            root.setPadding(new Insets(10));
+        root.getChildren().add(tabPaneContainer);
 
-            setupDatabaseControls(root);
-            setupTabPane(root);
+        root.getChildren().add(tabPane);
 
-            Scene scene = new Scene(root, 1000, 600);
-            primaryStage.setScene(scene);
-            primaryStage.show();
-        } catch (Exception e) {
-            e.printStackTrace();
-            showAlert("Error", "Failed to start application: " + e.getMessage());
-            Platform.exit();
-        }
+        Scene scene = new Scene(root, 1000, 600);
+
+        primaryStage.setScene(scene);
+
+
+        primaryStage.show();
     }
 
     private void setupDatabaseControls(VBox root) {
@@ -59,27 +70,36 @@ public class Main extends Application {
         root.getChildren().add(connectionControls);
     }
 
-    private void setupTabPane(VBox root) {
+    private void setupTabPane() {
         tabPane = new TabPane();
-
-        Tab homeTab = new Tab("Home");
-        homeTab.setContent(createHomeContent());
-
-        Tab booksTab = new Tab("Books");
-        booksTab.setContent(createBooksContent());
-
-        Tab authorsTab = new Tab("Authors");
-        authorsTab.setContent(createAuthorsContent());
-
-        Tab customersTab = new Tab("Customers");
-        customersTab.setContent(createCustomersContent());
+        tabPane.setPrefWidth(800);
+        tabPane.setPrefHeight(550);
         
+
+        Tab homeTab = createTab("Home", createHomeContent());
+        Tab booksTab = createTab("Books", createBooksContent());
+        Tab authorsTab = createTab("Authors", createAuthorsContent());
+        Tab customersTab = createTab("Customers", createCustomersContent());
+
         booksTab.setDisable(true);
-		authorsTab.setDisable(true);
-		customersTab.setDisable(true);
+        authorsTab.setDisable(true);
+        customersTab.setDisable(true);
 
         tabPane.getTabs().addAll(homeTab, booksTab, authorsTab, customersTab);
-        root.getChildren().add(tabPane);
+        tabPane.setStyle("-fx-background-color: " + BACKGROUND_COLOR + ";");
+
+        // Add a listener to style the selected tab
+        tabPane.getSelectionModel().selectedItemProperty().addListener((observable, oldTab, newTab) -> {
+            if (oldTab != null) {
+                oldTab.setStyle("-fx-background-color: " + TAB_COLOR + ";");
+            }
+            if (newTab != null) {
+                newTab.setStyle("-fx-background-color: " + ACTIVE_TAB_COLOR + "; -fx-background-insets: 0 1 0 1;");
+            }
+        });
+
+        // Initially style the first tab as selected
+        homeTab.setStyle("-fx-background-color: " + ACTIVE_TAB_COLOR + "; -fx-background-insets: 0 1 0 1;");
     }
 
     private VBox createHomeContent() {
@@ -103,7 +123,7 @@ public class Main extends Application {
         content.setPadding(new Insets(20));
 
         Label titleLabel = new Label("Book Management");
-        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-alignment: center");
 
         Button registerButton = new Button("Register New Book");
         registerButton.setOnAction(e -> bookManagement.showBookRegistrationForm());
@@ -150,6 +170,13 @@ public class Main extends Application {
 
         content.getChildren().addAll(titleLabel, registerButton, updateButton);
         return content;
+    }
+    
+    private Tab createTab(String title, Node content) {
+        Tab tab = new Tab(title);
+        tab.setContent(content);
+        tab.setStyle("-fx-background-color: " + TAB_COLOR + ";");
+        return tab;
     }
 
     private void connectToDatabase() {
