@@ -486,7 +486,19 @@ public class BookManagement {
         HBox pubdateBox = new HBox(7, pubdatePicker, dateFormatLabel);
         pubdateBox.setAlignment(Pos.CENTER_LEFT);
         ComboBox<String> pubidComboBox = new ComboBox<>();
-        pubidComboBox.getItems().addAll("1", "2", "3", "4", "5");
+        try {
+            String query = "SELECT PUBID, NAME FROM JL_PUBLISHER ORDER BY PUBID";
+            Statement stmt = connection.createStatement();
+            ResultSet rs = stmt.executeQuery(query);
+            while (rs.next()) {
+                String pubid = rs.getString("PUBID");
+                String name = rs.getString("NAME");
+                pubidComboBox.getItems().add(pubid + " - " + name);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showAlert("Error", "Failed to load publishers: " + e.getMessage());
+        }
         TextField costField = new TextField();
         TextField retailField = new TextField();
         TextField discountField = new TextField();
@@ -677,7 +689,7 @@ public class BookManagement {
             stmt.setString(1, isbn);
             stmt.setString(2, title);
             stmt.setDate(3, Date.valueOf(pubdate));
-            stmt.setString(4, pubid);
+            stmt.setString(4, pubid.split(" - ")[0]);
             
             // Handle empty cost
             if (cost.trim().isEmpty()) {
