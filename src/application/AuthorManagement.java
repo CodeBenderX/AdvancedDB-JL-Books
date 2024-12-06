@@ -298,7 +298,13 @@ public class AuthorManagement {
         );
 
         ListView<HBox> listView = new ListView<>();
+//        listView.setStyle("-fx-font-family: 'Courier New'; -fx-font-size: 12px;");
+//        listView.setPadding(new Insets(0, 10, 10, 10));
         listView.setStyle("-fx-font-family: 'Courier New'; -fx-font-size: 12px;");
+        listView.setPrefHeight(400); // Set a fixed height
+        listView.setPrefWidth(740);  // Set a fixed width
+        listView.setMaxHeight(400);  // Ensure the height doesn't exceed 400
+        listView.setMaxWidth(740);   // Ensure the width doesn't exceed 740
         listView.setPadding(new Insets(0, 10, 10, 10));
 
         String query = """
@@ -354,9 +360,12 @@ public class AuthorManagement {
         listView.setPrefHeight(totalHeight);
 
         // Set the stage size based on content
-        stage.setMinWidth(750);
-        stage.setMinHeight(totalHeight + 100); // Add extra space for header and padding
-        stage.setMaxHeight(totalHeight + 100); // Lock the maximum height
+//        stage.setMinWidth(750);
+//        stage.setMinHeight(totalHeight + 100); // Add extra space for header and padding
+//        stage.setMaxHeight(totalHeight + 100); // Lock the maximum height
+        
+        stage.setWidth(760);  // ListView width (740) + padding
+        stage.setHeight(480);
 
         stage.setScene(new Scene(vbox));
         stage.show();
