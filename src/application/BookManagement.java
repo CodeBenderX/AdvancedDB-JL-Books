@@ -7,6 +7,8 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -18,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 public class BookManagement {
     private Connection connection;
@@ -45,6 +48,7 @@ public class BookManagement {
         bookListView = new ListView<>();
         bookListView.setCellFactory(createBookCellFactory());
         bookListView.setPrefHeight(600);
+        bookListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
         HBox buttonBox = createButtonBox(stage, primaryStage);
         layout.getChildren().addAll(bookListView, buttonBox);
@@ -284,14 +288,31 @@ public class BookManagement {
             showAlert("Info", "No books selected for deletion.");
             return;
         }
+        
+        StringBuilder confirmationMessage = new StringBuilder("Are you sure you want to delete the following books?\n\n");
+        for (Book book : selectedBooks) {
+            try {
+                String authorNames = getAuthorNames(book.getIsbn());
+                confirmationMessage.append(String.format("- %s (ISBN: %s)\n  Authors: %s\n\n", 
+                    book.getTitle(), book.getIsbn(), authorNames));
+            } catch (SQLException e) {
+                showAlert("Error", "Failed to fetch author information: " + e.getMessage());
+                e.printStackTrace();
+                return;
+            }
+        }
 
         Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
         confirmAlert.setTitle("Confirm Deletion");
         confirmAlert.setHeaderText("Delete Selected Books");
-        confirmAlert.setContentText("Are you sure you want to delete the selected books?");
+        confirmAlert.setContentText(confirmationMessage.toString());
+
+        ButtonType confirmButton = new ButtonType("Confirm Delete");
+        ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        confirmAlert.getButtonTypes().setAll(confirmButton, cancelButton);
 
         confirmAlert.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
+            if (response == confirmButton) {
                 for (Book book : selectedBooks) {
                     deleteBookFromDatabase(book);
                 }
@@ -301,14 +322,55 @@ public class BookManagement {
     }
 
     private void deleteBookFromDatabase(Book book) {
+    	try {
+            connection.setAutoCommit(false);
+            String deleteRelationshipsSql = "DELETE FROM JL_BOOKAUTHOR WHERE ISBN = ?";
+            try (PreparedStatement deleteRelStmt = connection.prepareCall(deleteRelationshipsSql)) {
+                deleteRelStmt.setString(1, book.getIsbn());
+                deleteRelStmt.executeUpdate();
+            }
         String sql = "{CALL sp_Book_delete(?)}";
         try (CallableStatement stmt = connection.prepareCall(sql)) {
             stmt.setString(1, book.getIsbn());
-            stmt.execute();
+            stmt.executeUpdate();
+        	}
+        	connection.commit();
             System.out.println("Book deleted successfully: " + book.getIsbn());
-        } catch (SQLException e) {
+            
+    	} catch (SQLException e) {
+            try {
+                // If any error occurs, rollback the transaction
+                connection.rollback();
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
             e.printStackTrace();
             showAlert("Error", "Failed to delete book: " + e.getMessage());
+        } finally {
+            try {
+                // Reset auto-commit to true
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
+    private String getAuthorNames(String isbn) throws SQLException {
+        String query = "SELECT A.FNAME || ' ' || A.LNAME AS AUTHOR_NAME " +
+                       "FROM JL_AUTHOR A " +
+                       "JOIN JL_BOOKAUTHOR BA ON A.AUTHORID = BA.AUTHORID " +
+                       "WHERE BA.ISBN = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, isbn);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                StringBuilder authors = new StringBuilder();
+                while (rs.next()) {
+                    if (authors.length() > 0) authors.append(", ");
+                    authors.append(rs.getString("AUTHOR_NAME"));
+                }
+                return authors.length() > 0 ? authors.toString() : "No authors assigned";
+            }
         }
     }
 
@@ -537,10 +599,50 @@ public class BookManagement {
         stage.setScene(scene);
         stage.show();
     }
+    
+    private boolean isbnExists(String isbn) {
+        String query = "SELECT COUNT(*) FROM JL_BOOKS WHERE ISBN = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, isbn);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showAlert("Error", "Failed to check ISBN: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    private String titleExistsWithDifferentIsbn(String title, String isbn) {
+        String query = "SELECT ISBN FROM JL_BOOKS WHERE TITLE = ? AND ISBN != ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setString(1, title);
+            pstmt.setString(2, isbn);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("ISBN");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            showAlert("Error", "Failed to check title: " + e.getMessage());
+        }
+        return null;
+    }
 
     private void setupFieldValidations(TextField isbnField, TextField titleField, TextField costField,
                                        TextField retailField, TextField discountField, TextField categoryField) {
         // ISBN validation
+    	isbnField.focusedProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue) { // When focus is lost
+                validateIsbn(isbnField);
+            }
+        });
+        isbnField.setOnAction(event -> validateIsbn(isbnField));
+    	
         isbnField.textProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
                 String filtered = newValue.replaceAll("[^a-zA-Z0-9]", "");
@@ -555,6 +657,13 @@ public class BookManagement {
         });
 
         // Title validation
+        titleField.focusedProperty().addListener((observable, oldValue, newValue) -> {
+            if (!newValue) { // When focus is lost
+                validateTitle(titleField, isbnField);
+            }
+        });
+        titleField.setOnAction(event -> validateTitle(titleField, isbnField));
+        
         titleField.textProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null && newValue.length() > 30) {
                 titleField.setText(oldValue);
@@ -600,6 +709,46 @@ public class BookManagement {
             }
         });
     }
+    
+    private void validateIsbn(TextField isbnField) {
+        String isbn = isbnField.getText().trim();
+        if (!isbn.isEmpty() && isbnExists(isbn)) {
+            showAlert("ISBN Already Exists", "This ISBN is already in use. Please enter a different ISBN.");
+            Platform.runLater(() -> {
+                isbnField.requestFocus();
+                isbnField.selectAll();
+            });
+        }
+    }
+    
+    private void validateTitle(TextField titleField, TextField isbnField) {
+        String title = titleField.getText().trim();
+        String isbn = isbnField.getText().trim();
+        if (!title.isEmpty() && !isbn.isEmpty()) {
+            String existingIsbn = titleExistsWithDifferentIsbn(title, isbn);
+            if (existingIsbn != null) {
+                Alert alert = new Alert(AlertType.WARNING);
+                alert.setTitle("Title Already Exists");
+                alert.setHeaderText("This title exists with a different ISBN.");
+                alert.setContentText("A book with the title \"" + title + "\" already exists with ISBN: " + existingIsbn + ".\n\nDo you want to use this title anyway?");
+
+                ButtonType confirmButton = new ButtonType("Confirm Title");
+                ButtonType cancelButton = new ButtonType("Cancel", ButtonData.CANCEL_CLOSE);
+
+                alert.getButtonTypes().setAll(confirmButton, cancelButton);
+
+                Optional<ButtonType> result = alert.showAndWait();
+                if (result.isPresent() && result.get() == cancelButton) {
+                    Platform.runLater(() -> {
+                        titleField.requestFocus();
+                        titleField.selectAll();
+                    });
+                }
+            }
+        }
+    }
+
+
     
     private void setupPubdateValidation(DatePicker pubdatePicker) {
         pubdatePicker.getEditor().textProperty().addListener((observable, oldValue, newValue) -> {
